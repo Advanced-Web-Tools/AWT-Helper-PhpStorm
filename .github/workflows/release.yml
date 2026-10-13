@@ -1,0 +1,123 @@
+name: Release plugin
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Test and package
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: |
+            17
+            21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Choose release version
+        id: version
+        shell: bash
+        run: |
+          python3 <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          properties = Path('gradle.properties').read_text()
+          match = re.search(r'^version\s*=\s*(\S+)\s*$', properties, re.MULTILINE)
+          if not match:
+              raise SystemExit('gradle.properties must define version.')
+          base = match.group(1).removesuffix('-SNAPSHOT')
+          if not re.fullmatch(r'\d+\.\d+\.\d+', base):
+              raise SystemExit('Use a base version such as 1.0.0 or 1.0.0-SNAPSHOT.')
+          version = f"{base}.{os.environ['GITHUB_RUN_NUMBER']}"
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'version={version}\ntag=v{version}\n')
+          PY
+
+      - name: Test and build plugin
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: bash ./gradlew --no-daemon --console=plain test buildPlugin verifyPluginProjectConfiguration -Pversion="$RELEASE_VERSION"
+
+      - name: Upload installable plugin
+        uses: actions/upload-artifact@v7
+        with:
+          name: awt-helper-plugin
+          path: build/distributions/*.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports
+          path: |
+            build/reports/tests/
+            build/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  release:
+    name: Publish GitHub release
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download installable plugin
+        uses: actions/download-artifact@v8
+        with:
+          name: awt-helper-plugin
+          path: release-assets
+
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_VERSION: ${{ needs.build.outputs.version }}
+          RELEASE_TAG: ${{ needs.build.outputs.tag }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          assets=(release-assets/*.zip)
+          if (( ${#assets[@]} == 0 )); then
+            echo 'No plugin ZIP was produced.' >&2
+            exit 1
+          fi
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber
+          else
+            gh release create "$RELEASE_TAG" "${assets[@]}" \
+              --target "$GITHUB_SHA" \
+              --title "AWT Helper $RELEASE_VERSION" \
+              --generate-notes \
+              --latest
+          fi

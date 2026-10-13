@@ -1,0 +1,38 @@
+# Gradle and Kotlin caches
+.gradle/
+.kotlin/
+
+# Build outputs and IntelliJ plugin sandboxes
+build/
+out/
+.intellijPlatform/
+
+# Local IDE configuration
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# Local credentials and environment overrides
+.env
+.env.*
+!.env.example
+!.env.sample
+local.properties
+/.aws/
+/.codex/
+
+# Logs, temporary files, and editor backups
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Operating system files
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini

@@ -1,0 +1,29 @@
+<idea-plugin>
+  <id>com.awt.AWTHelper</id>
+  <name>AWT Helper</name>
+  <vendor url="https://github.com/Advanced-Web-Tools">Advanced Web Tools</vendor>
+  <description><![CDATA[Create AWT packages, build and deploy with the official AWT build environment, and run a local framework server.]]></description>
+  <depends>com.intellij.modules.platform</depends>
+  <depends>com.jetbrains.php</depends>
+  <extensions defaultExtensionNs="com.intellij">
+    <directoryProjectGenerator implementation="com.awt.helper.AwtProjectGenerator"/>
+    <projectConfigurable id="awt.helper" displayName="AWT Helper" instance="com.awt.helper.AwtSettings"/>
+    <programRunner implementation="com.awt.helper.AwtRunner"/>
+    <configurationType implementation="com.awt.helper.AwtBuildType"/>
+    <configurationType implementation="com.awt.helper.AwtServerType"/>
+    <postStartupActivity implementation="com.awt.helper.AwtStartup"/>
+    <notificationGroup id="AWT Helper" displayType="BALLOON"/>
+  </extensions>
+  <actions>
+    <action id="AWT.ReloadDependencies" class="com.awt.helper.ReloadDependenciesAction"
+            text="AWT: Reload Dependencies"
+            description="Download dependencies from the current package manifest and refresh PHP library links"
+            icon="com.awt.helper.AwtIcons.project">
+      <add-to-group group-id="ToolsMenu" anchor="last"/>
+      <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+      <keyboard-shortcut keymap="$default" first-keystroke="control alt shift R"/>
+      <keyboard-shortcut keymap="Mac OS X" first-keystroke="meta alt shift R" replace-all="true"/>
+      <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta alt shift R" replace-all="true"/>
+    </action>
+  </actions>
+</idea-plugin>
